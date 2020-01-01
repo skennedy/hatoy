@@ -11,14 +11,14 @@ lazy val root = (project in file(".")).
     name := "hatoy",
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-http"                % akkaHttpVersion,
-      "com.typesafe.akka" %% "akka-http-spray-json"     % akkaHttpVersion,
-      "com.typesafe.akka" %% "akka-actor-typed"         % akkaVersion,
+//      "com.typesafe.akka" %% "akka-http-spray-json"     % akkaHttpVersion,
       "com.typesafe.akka" %% "akka-stream"              % akkaVersion,
       "com.hazelcast"     %  "hazelcast"                % hazelcastVersion,
       "ch.qos.logback"    % "logback-classic"           % "1.2.3",
+      "org.typelevel"     %% "cats-effect" % "2.0.0",
 
       "com.typesafe.akka" %% "akka-http-testkit"        % akkaHttpVersion % Test,
-      "com.typesafe.akka" %% "akka-actor-testkit-typed" % akkaVersion     % Test,
+//      "com.typesafe.akka" %% "akka-actor-testkit-typed" % akkaVersion     % Test,
       "org.scalatest"     %% "scalatest"                % "3.0.8"         % Test
     )
   )

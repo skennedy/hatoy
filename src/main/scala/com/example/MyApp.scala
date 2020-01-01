@@ -1,58 +1,67 @@
 package com.example
 
-import akka.actor.typed.ActorSystem
-import akka.actor.typed.scaladsl.adapter._
+import java.util.concurrent.{ExecutorService, Executors}
+
+import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives.{complete, get, path, _}
 import akka.http.scaladsl.server.Route
-import com.example.HALockActor.{AlreadyLocked, GotLock, GetLockResult, TryGetLock}
 import com.hazelcast.core.Hazelcast
-import akka.actor.typed.scaladsl.AskPattern._
 import akka.util.Timeout
+import cats.effect.concurrent.Ref
+import cats.effect.{ContextShift, IO}
+import cats.syntax.apply._
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import com.hazelcast.spi.ExecutionService
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
 import scala.util.{Failure, Success}
 
 object MyApp extends App {
-  val waitingRoute: Route =
-    get {
-      path("health") {
-        complete("waiting for lock ...")
-      }
-    }
-
-  val lockedRoute: Route =
-    get {
-      path("health") {
-        complete("got the lock :)")
-      }
-    }
-
   val port = args.head.toInt
 
+  @volatile var isLocked: Boolean = false
 
-  @volatile var routes: Route = waitingRoute
+  val routes: Route =
+    get {
+      pathSingleSlash {
+        complete("hello")
+      } ~ path("health") {
+        complete {
+          if (isLocked)
+            s"Ok, lock held by service running on port $port"
+          else StatusCodes.Locked
+        }
+      }
+    }
+
 
   //#start-http-server
+  val ec: ExecutionContext = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
   val hz = Hazelcast.newHazelcastInstance()
-  val HALockSystem = ActorSystem[TryGetLock](HALockActor(hz), "HA-Actor-system")
+  val lockChecker = LockChecker(hz)
+  val timer = IO.timer(ec)
 
-
-  implicit val system = HALockSystem.toClassic
-
-  val lock = hz.getLock("my-app-lock")
-  implicit val ec: ExecutionContext = scala.concurrent.ExecutionContext.global
-  implicit val timeout: Timeout = Timeout(3.seconds)
-  implicit val scheduler = schedulerFromActorSystem(HALockSystem)
-
-  val getLockResult = Await.result(HALockSystem.ask[GetLockResult](ref => HALockActor.TryGetLock(ref)), 15.seconds)
-
-  routes = getLockResult match {
-    case AlreadyLocked => waitingRoute
-    case GotLock => lockedRoute
+  val updateRouteWhenLockAvailable: IO[Unit] = {
+    lockChecker.tryGetLock.flatMap { gotLock =>
+      IO {
+        system.log.info(s"trying to acquire lock. Got it? $gotLock")
+        isLocked = gotLock
+      } *> timer.sleep(10.seconds) *>  updateRouteWhenLockAvailable
+    }
   }
 
+  implicit val system = ActorSystem()
+
+
+  val lock = hz.getLock("my-app-lock")
+  implicit val timeout: Timeout = Timeout(3.seconds)
+  implicit val cs: ContextShift[IO] = IO.contextShift(ec)
+
+  val lockCheckerFiber = updateRouteWhenLockAvailable.start.unsafeRunSync()
   val futureBinding = Http().bindAndHandle(routes, "localhost", port)
   futureBinding.onComplete {
     case Success(binding) =>
