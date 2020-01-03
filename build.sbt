@@ -16,9 +16,10 @@ lazy val root = (project in file(".")).
       "com.hazelcast"     %  "hazelcast"                % hazelcastVersion,
       "ch.qos.logback"    % "logback-classic"           % "1.2.3",
       "org.typelevel"     %% "cats-effect" % "2.0.0",
-
+      "io.chrisdavenport" %% "log4cats-slf4j"   % "1.0.1",
       "com.typesafe.akka" %% "akka-http-testkit"        % akkaHttpVersion % Test,
-//      "com.typesafe.akka" %% "akka-actor-testkit-typed" % akkaVersion     % Test,
       "org.scalatest"     %% "scalatest"                % "3.0.8"         % Test
-    )
+
+    ),
+    addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
   )
