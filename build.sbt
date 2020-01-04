@@ -20,6 +20,9 @@ lazy val root = (project in file(".")).
       "com.typesafe.akka" %% "akka-http-testkit"        % akkaHttpVersion % Test,
       "org.scalatest"     %% "scalatest"                % "3.0.8"         % Test
 
+
     ),
+    javaOptions ++= Seq("-Dhazelcast.shutdownhook.policy=GRACEFUL", "-Dhazelcast.graceful.shutdown.max.wait=600"),
     addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+    mainClass in assembly := Some("com.example.MyApp")
   )
