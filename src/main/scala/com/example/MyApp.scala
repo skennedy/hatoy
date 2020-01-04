@@ -35,9 +35,10 @@ object MyApp extends IOApp {
         }
       }
 
-    def bindService(implicit actorSystem: ActorSystem) = IO.fromFuture {
-      IO(Http().bindAndHandle(routes, "localhost", port))
-    }.flatMap(binding => Logger[IO].info(s"Server online at http://${binding.localAddress.getHostString}:${binding.localAddress.getPort}")) *> IO.never
+    def bindService(implicit actorSystem: ActorSystem): IO[Unit] =
+      IO.fromFuture {
+        IO(Http().bindAndHandle(routes, "localhost", port))
+      }.flatMap(bindings => Logger[IO].info(s"Server bound on port ${bindings.localAddress.getPort}"))
 
     (for {
       actorSystem <- actorSystemResource
@@ -50,7 +51,7 @@ object MyApp extends IOApp {
         } *> Logger[IO].info(s"Polling lock status... got lock? $gotLock")
       }
 
-      (lockChecker.observeLockStatus(10.seconds)(updateLockState) *> bindService(actorSystem)).as(ExitCode.Success)
+      (lockChecker.pollLockStatus(10.seconds)(updateLockState).start *> bindService(actorSystem) *> IO.never).as(ExitCode.Success)
     }
   }
 
