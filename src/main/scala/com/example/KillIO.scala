@@ -1,6 +1,5 @@
 package com.example
 
-import cats.effect.ExitCase.Canceled
 import cats.effect.concurrent.Ref
 import cats.effect.{ExitCode, IO, IOApp, Resource}
 

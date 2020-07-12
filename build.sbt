@@ -1,12 +1,12 @@
 lazy val akkaHttpVersion = "10.1.11"
 lazy val akkaVersion    = "2.6.1"
-lazy val hazelcastVersion = "3.12.5"
+lazy val hazelcastVersion = "4.0.2"
 
 lazy val root = (project in file(".")).
   settings(
     inThisBuild(List(
       organization    := "com.example",
-      scalaVersion    := "2.13.1"
+      scalaVersion    := "2.13.3"
     )),
     name := "hatoy",
     libraryDependencies ++= Seq(
@@ -15,7 +15,7 @@ lazy val root = (project in file(".")).
       "com.typesafe.akka" %% "akka-stream"              % akkaVersion,
       "com.hazelcast"     %  "hazelcast"                % hazelcastVersion,
       "ch.qos.logback"    % "logback-classic"           % "1.2.3",
-      "org.typelevel"     %% "cats-effect" % "2.0.0",
+      "org.typelevel"     %% "cats-effect" % "2.1.3",
       "io.chrisdavenport" %% "log4cats-slf4j"   % "1.0.1",
       "com.typesafe.akka" %% "akka-http-testkit"        % akkaHttpVersion % Test,
       "org.scalatest"     %% "scalatest"                % "3.0.8"         % Test
