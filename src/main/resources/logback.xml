@@ -17,4 +17,6 @@
         <appender-ref ref="ASYNC"/>
     </root>
 
+    <logger name="com.example.imperative" level="debug" />
+
 </configuration>

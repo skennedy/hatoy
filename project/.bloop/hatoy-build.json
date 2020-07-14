@@ -213,7 +213,7 @@
         "platform": {
             "name": "jvm",
             "config": {
-                "home": "/usr/lib/jvm/java-8-openjdk/jre",
+                "home": "/nix/store/k0csyr3hsjh5cz11n3mkhdcmbmp4zc4c-openjdk-8u242-b08/lib/openjdk/jre",
                 "options": [
                     "-Duser.dir=/home/andrea/code/hatoy/project"
                 ]
