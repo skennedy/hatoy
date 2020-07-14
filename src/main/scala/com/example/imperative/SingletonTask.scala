@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.duration._
 import scala.concurrent.duration.FiniteDuration
 
-class SingletonTask0(hz: HazelcastInstance, interval: FiniteDuration, lockId: String)(logic: () => Unit) {
+class SingletonTask(hz: HazelcastInstance, interval: FiniteDuration, lockId: String)(logic: () => Unit) {
   private val executor = Executors.newSingleThreadScheduledExecutor()
   val logger           = LoggerFactory.getLogger(this.getClass)
 
@@ -29,15 +29,15 @@ class SingletonTask0(hz: HazelcastInstance, interval: FiniteDuration, lockId: St
     TimeUnit.MILLISECONDS,
   )
 }
-object SingletonTask0 {
-  def currentWeather(hz: HazelcastInstance): SingletonTask0 = {
+object SingletonTask {
+  def currentWeather(hz: HazelcastInstance): SingletonTask = {
     val cities            = List("bari", "barcelona", "athens", "london", "paris", "chania", "new-york")
     val currentWeatherMap = hz.getMap[String, CurrentWeather](Maps.currentWeather)
 
     //executes only on the partition that owns the map key
     currentWeatherMap.addLocalEntryListener(new WeatherChangeListener(hz))
 
-    new SingletonTask0(hz, 30.seconds, Locks.currentWeather)(() =>
+    new SingletonTask(hz, 30.seconds, Locks.currentWeather)(() =>
       for (city <- cities) {
         val conditions = scala.util.Random.shuffle(Conditions.values).head
         currentWeatherMap.put(

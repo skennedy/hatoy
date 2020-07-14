@@ -1,10 +1,8 @@
-package com.example.imperative
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import com.example.imperative._
 import com.hazelcast.config.Config
 import com.hazelcast.config.cp.CPSubsystemConfig
 import com.hazelcast.core.Hazelcast
@@ -22,17 +20,17 @@ object Main extends App {
 
   class NodeLifecycleListener extends LifecycleListener {
     override def stateChanged(event: LifecycleEvent) {
-      logger.info(s"intercepting lifecycle event ${event}")
+      logger.debug(s"intercepting lifecycle event ${event}")
     }
   }
   val config            = new Config()
   val cpSubsystemConfig = new CPSubsystemConfig()
+  //setting this value to 0 disables the CP subsystem as we want to run even with less than 3 instances
   cpSubsystemConfig.setCPMemberCount(0)
-  //    cpSubsystemConfig.setGroupSize(3)
   cpSubsystemConfig.setSessionHeartbeatIntervalSeconds(1)
   cpSubsystemConfig.setSessionTimeToLiveSeconds(5)
-
   config.setCPSubsystemConfig(cpSubsystemConfig)
+
   val hz = Hazelcast.newHazelcastInstance(config)
   hz.getLifecycleService.addLifecycleListener(new NodeLifecycleListener)
 
@@ -40,6 +38,7 @@ object Main extends App {
 
   implicit val actorSystem = ActorSystem()
 
+  import akka.http.scaladsl.server.Directives._
   val routes: Route =
     get {
       path("current-weather" / Segment) { city =>
@@ -56,5 +55,5 @@ object Main extends App {
     }
 
   Http().bindAndHandle(routes, "0.0.0.0", port)
-  SingletonTask0.currentWeather(hz)
+  SingletonTask.currentWeather(hz)
 }
