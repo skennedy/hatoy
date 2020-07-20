@@ -3,12 +3,11 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.example.imperative._
-import com.hazelcast.config.Config
-import com.hazelcast.config.cp.CPSubsystemConfig
-import com.hazelcast.core.Hazelcast
-import com.hazelcast.core.LifecycleEvent
-import com.hazelcast.core.LifecycleListener
 import org.slf4j.LoggerFactory
+import org.apache.ignite.Ignition
+import org.apache.ignite.cache.CacheAtomicityMode
+import org.apache.ignite.configuration.IgniteConfiguration
+import org.apache.ignite.events.EventType
 
 object Main extends App {
   val port: Int =
@@ -18,42 +17,33 @@ object Main extends App {
 
   val logger = LoggerFactory.getLogger("main")
 
-  class NodeLifecycleListener extends LifecycleListener {
-    override def stateChanged(event: LifecycleEvent) {
-      logger.debug(s"intercepting lifecycle event ${event}")
-    }
-  }
-  val config            = new Config()
-  val cpSubsystemConfig = new CPSubsystemConfig()
-  //setting this value to 0 disables the CP subsystem as we want to run even with less than 3 instances
-  cpSubsystemConfig.setCPMemberCount(0)
-  cpSubsystemConfig.setSessionHeartbeatIntervalSeconds(1)
-  cpSubsystemConfig.setSessionTimeToLiveSeconds(5)
-  config.setCPSubsystemConfig(cpSubsystemConfig)
+  val cfg = new IgniteConfiguration
+  cfg.setIncludeEventTypes(EventType.EVTS_CACHE: _*)
 
-  val hz = Hazelcast.newHazelcastInstance(config)
-  hz.getLifecycleService.addLifecycleListener(new NodeLifecycleListener)
+  val ignite = Ignition.start(cfg)
 
-  val adsTopic = hz.getTopic[Advert](Topic.ads)
+  val msg = ignite.message()
 
   implicit val actorSystem = ActorSystem()
+
+  logger.info("Booting")
 
   import akka.http.scaladsl.server.Directives._
   val routes: Route =
     get {
       path("current-weather" / Segment) { city =>
         pathEndOrSingleSlash {
-          Option(hz.getMap[String, CurrentWeather](Maps.currentWeather).get(city))
+          Option(ignite.getOrCreateCache[String, CurrentWeather](Maps.currentWeather).get(city))
             .fold(complete(StatusCodes.NotFound))(conditions => complete(conditions.toString))
         }
       } ~
         path("ads") {
           pathEndOrSingleSlash {
-            handleWebSocketMessages(AdvertsFlow(adsTopic))
+            handleWebSocketMessages(AdvertsFlow(msg))
           }
         }
     }
 
   Http().bindAndHandle(routes, "0.0.0.0", port)
-  SingletonTask.currentWeather(hz)
+  SingletonTask.currentWeather(ignite)
 }

@@ -14,11 +14,11 @@ Form a local cluster by running 2-3 instances of the app. You can specify a port
 an argument to the project `Main` class.
 
 ```bash
-sbt run 9999
+sbt "run 9999"
 //...
-sbt run 10000
+sbt "run 10000"
 //...
-sbt run 10001
+sbt "run 10001"
 ```
 Once the nodes are up, one and only one of them will be holding a lock and populate a distributed
 map of current weather conditions (keyed by city). One can access to the current weather condition from any

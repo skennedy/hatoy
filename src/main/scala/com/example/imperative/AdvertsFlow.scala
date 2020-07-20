@@ -7,11 +7,11 @@ import akka.http.scaladsl.model.ws.TextMessage
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
-import com.hazelcast.topic.ITopic
+import org.apache.ignite.IgniteMessaging
 
 object AdvertsFlow {
-  def apply(adsTopic: ITopic[Advert])(implicit as: ActorSystem): Flow[Message, Message, NotUsed] = {
-    val source = Source.fromGraph(new HZTopicSource(adsTopic)).map(ad => TextMessage(ad.toString): Message)
+  def apply(msg: IgniteMessaging)(implicit as: ActorSystem): Flow[Message, Message, NotUsed] = {
+    val source = Source.fromGraph(new IgniteTopicSource(msg, Topic.ads)).map(ad => TextMessage(ad.toString): Message)
     Flow.fromSinkAndSourceCoupled[Message, Message](Sink.foreach(println(">>> ", _)), source)
   }
 }

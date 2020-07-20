@@ -1,27 +1,40 @@
 package com.example.imperative
 
-import com.hazelcast.core.EntryEvent
-import com.hazelcast.core.HazelcastInstance
-import com.hazelcast.map.listener.EntryUpdatedListener
+import java.lang
+
+import javax.cache.event.CacheEntryEvent
+import javax.cache.event.CacheEntryUpdatedListener
+import org.apache.ignite.Ignite
 import org.slf4j.LoggerFactory
 
-class WeatherChangeListener(hz: HazelcastInstance) extends EntryUpdatedListener[String, CurrentWeather] {
+import scala.jdk.CollectionConverters._
+
+class WeatherChangeListener(ignite: Ignite) extends CacheEntryUpdatedListener[String, CurrentWeather] {
   protected val logger = LoggerFactory.getLogger(this.getClass)
-  override def entryUpdated(event: EntryEvent[String, CurrentWeather]): Unit = {
-    val topic = hz.getTopic[Advert](Topic.ads)
+  override def onUpdated(
+    events: lang.Iterable[CacheEntryEvent[_ <: String, _ <: CurrentWeather]],
+  ): Unit =
+    events.asScala.foreach { event =>
+      val msg = ignite.message()
 
-    val previous = event.getOldValue.conditions
-    val current  = event.getValue.conditions
+      (Option(event.getOldValue), Option(event.getValue)) match {
+        case (Some(old), Some(value)) =>
+          val previous = old.conditions
+          val current  = value.conditions
 
-    if (current == Conditions.Cloudy && current != previous) {
-      val ad = Advert(event.getKey, "Buy this umbrella!")
-      logger.info(s"Publishing advert: $ad")
-      topic.publish(ad)
+          if (current == Conditions.Cloudy && current != previous) {
+            val ad = Advert(event.getKey, "Buy this umbrella!")
+            logger.info(s"Publishing advert: $ad")
+            msg.send(Topic.ads, ad)
+          }
+          if (event.getKey == "london" && current == Conditions.Sunny && current != previous) {
+            val ad = Advert(event.getKey, "Buy a disposable BBQ!")
+            logger.info(s"Publishing advert: $ad")
+            msg.send(Topic.ads, ad)
+          }
+        case (o, v) =>
+          logger.info(s"Ignoring update of $o -> $v")
+      }
+
     }
-    if (event.getKey == "london" && current == Conditions.Sunny && current != previous) {
-      val ad = Advert(event.getKey, "Buy a disposable BBQ!")
-      logger.info(s"Publishing advert: $ad")
-      topic.publish(ad)
-    }
-  }
 }

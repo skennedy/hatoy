@@ -1,17 +1,18 @@
 package com.example.imperative
 
+import java.util.UUID
+
 import akka.stream.Attributes
 import akka.stream.Outlet
 import akka.stream.SourceShape
 import akka.stream.stage.GraphStage
 import akka.stream.stage.GraphStageLogic
 import akka.stream.stage.OutHandler
-import com.hazelcast.topic.ITopic
-import com.hazelcast.topic.Message
-import com.hazelcast.topic.MessageListener
+import org.apache.ignite.IgniteMessaging
+import org.apache.ignite.lang.IgniteBiPredicate
 import org.slf4j.LoggerFactory
 
-class HZTopicSource(topic: ITopic[Advert]) extends GraphStage[SourceShape[Advert]] {
+class IgniteTopicSource(msg: IgniteMessaging, topic: String) extends GraphStage[SourceShape[Advert]] {
   val out: Outlet[Advert] = Outlet("HZTopicSource.out")
 
   override val shape: SourceShape[Advert] = SourceShape(out)
@@ -25,14 +26,17 @@ class HZTopicSource(topic: ITopic[Advert]) extends GraphStage[SourceShape[Advert
       }
 
       override def preStart(): Unit =
-        topic.addMessageListener(
-          new MessageListener[Advert] {
-            override def onMessage(message: Message[Advert]): Unit = {
-              logger.debug(s"""Got topic message ${message.getMessageObject}, envelope: $message""")
-              callback.invoke(message.getMessageObject)
+        msg.localListen(
+          topic,
+          (_, message: AnyRef) => {
+            logger.debug(s"""Got topic message ${message}""")
+            message match {
+              case a: Advert => callback.invoke(a)
             }
+            true
           },
         )
+
       setHandler(out,
                  new OutHandler {
                    override def onPull() = ()
