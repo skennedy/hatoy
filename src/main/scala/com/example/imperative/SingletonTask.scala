@@ -1,30 +1,36 @@
 package com.example.imperative
 
 import java.time.LocalDateTime
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 import org.apache.ignite.Ignite
 import org.apache.ignite.cache.query.ContinuousQuery
 import org.apache.ignite.services.Service
-import org.apache.ignite.services.ServiceContext
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.duration._
 
-class SingletonTask(interval: FiniteDuration)(logic: () => Unit) extends Service {
+class SingletonTask(ignite: Ignite, interval: FiniteDuration)(logic: () => Unit) {
+  private val executor = Executors.newSingleThreadScheduledExecutor()
+  val logger           = LoggerFactory.getLogger(this.getClass)
 
-  val logger = LoggerFactory.getLogger(this.getClass)
-
-  override def init(ctx: ServiceContext): Unit = ()
-
-  override def cancel(ctx: ServiceContext): Unit = ()
-
-  override def execute(ctx: ServiceContext): Unit =
-    while (!ctx.isCancelled) {
-      logic()
-      Thread.sleep(interval.toMillis)
-    }
+  executor.scheduleAtFixedRate(
+    () =>
+      // only execute logic on oldest node in cluster
+      if (ignite.cluster().forOldest().node().id() == ignite.cluster().localNode().id()) {
+        logger.debug(s"executing singleton task")
+        logic()
+      } else {
+        logger.debug("Couldn't execute singleton task")
+      },
+    0,
+    interval.toMillis,
+    TimeUnit.MILLISECONDS,
+  )
 }
+
 object SingletonTask {
   def currentWeather(ignite: Ignite): Unit = {
     val cities            = List("bari", "barcelona", "athens", "london", "paris", "chania", "new-york")
@@ -38,20 +44,15 @@ object SingletonTask {
         .setLocal(true),
     )
 
-    // "services" are a weird way of deploying executable threads of code, which we leverage to have a singleton
-    // TODO: investigate scheduling
-    ignite.services().deployClusterSingleton(
-      Locks.currentWeather,
-      new SingletonTask(30.seconds)(() =>
-        for (city <- cities) {
+    new SingletonTask(ignite, 30.seconds)(() =>
+      for (city <- cities) {
 
-          val conditions = scala.util.Random.shuffle(Conditions.values).head
-          currentWeatherMap.put(
-            city,
-            CurrentWeather(city, conditions, ignite.cluster().localNode().id(), LocalDateTime.now()),
-          )
-        },
-      ),
+        val conditions = scala.util.Random.shuffle(Conditions.values).head
+        currentWeatherMap.put(
+          city,
+          CurrentWeather(city, conditions, ignite.cluster().localNode().id(), LocalDateTime.now()),
+        )
+      },
     )
   }
 }
