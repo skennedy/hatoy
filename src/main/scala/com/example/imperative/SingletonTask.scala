@@ -1,10 +1,7 @@
 package com.example.imperative
 
 import java.time.LocalDateTime
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
 
-import javax.cache.event.CacheEntryEvent
 import org.apache.ignite.Ignite
 import org.apache.ignite.cache.query.ContinuousQuery
 import org.apache.ignite.services.Service
@@ -33,21 +30,13 @@ object SingletonTask {
     val cities            = List("bari", "barcelona", "athens", "london", "paris", "chania", "new-york")
     val currentWeatherMap = ignite.getOrCreateCache[String, CurrentWeather](Maps.currentWeather)
 
-    // we execute a continuous query on every node in the cluster
-    // this will receive *all* updates on the cache by default
-    val events = new ContinuousQuery[String, CurrentWeather]
-    events.setLocalListener(new WeatherChangeListener(ignite))
-
-    // this "remote filter" means that only updates written on the current node will trigger this query
-    // this is a weird way to hide duplicate updates - would make more sense for the continuous query to only run on one node.
-    val currentNode = ignite.cluster().localNode()
-    events.setRemoteFilterFactory(() =>
-      (_: CacheEntryEvent[_ <: String, _ <: CurrentWeather]) => currentNode.id.equals(ignite.cluster.localNode.id),
+    // we execute a continuous query which will only receive updates for cache keys stored on local node (due to setLocal(true))
+    // NOTE: this returns a cursor which should be closed to free resources normally
+    currentWeatherMap.query(
+      new ContinuousQuery[String, CurrentWeather]
+        .setLocalListener(new WeatherChangeListener(ignite))
+        .setLocal(true),
     )
-
-    // actually run the query against the map
-    // - this outputs a cursor to see the current state, but we only care about ongoing updates
-    currentWeatherMap.query(events)
 
     // "services" are a weird way of deploying executable threads of code, which we leverage to have a singleton
     // TODO: investigate scheduling
